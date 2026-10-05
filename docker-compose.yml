@@ -1,0 +1,19 @@
+# origem: compose oficial do pthom/northwind_psql (submódulo em source/) + nossos ajustes
+include:
+  - path: [source/docker-compose.yml, northwind.override.yml]
+
+services:
+  # destino: bronze, silver e gold
+  dw:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dw
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./dw/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports: ["55433:5432"]
+    networks: [db]
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 2s
+      retries: 30

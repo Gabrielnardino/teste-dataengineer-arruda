@@ -1,0 +1,11 @@
+docs/
+.claude/
+CLAUDE.md
+AGENTS.md
+.env
+
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml
+*.log

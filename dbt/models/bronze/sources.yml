@@ -1,0 +1,48 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Cópia fiel das tabelas do Northwind, carregada pelo Apache Hop (full load).
+    schema: bronze
+    tables:
+      - name: raw_customers
+        description: Clientes, como vieram da origem.
+        columns:
+          - name: customer_id
+            data_tests: [unique, not_null]
+
+      - name: raw_orders
+        description: Cabeçalho dos pedidos, como veio da origem.
+        columns:
+          - name: order_id
+            data_tests: [unique, not_null]
+          - name: customer_id
+            data_tests:
+              - relationships:
+                  to: source('bronze', 'raw_customers')
+                  field: customer_id
+
+      - name: raw_order_details
+        description: Itens dos pedidos, como vieram da origem.
+        data_tests:
+          - combinacao_unica:
+              colunas: [order_id, product_id]
+        columns:
+          - name: order_id
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('bronze', 'raw_orders')
+                  field: order_id
+          - name: product_id
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('bronze', 'raw_products')
+                  field: product_id
+
+      - name: raw_products
+        description: Produtos, como vieram da origem.
+        columns:
+          - name: product_id
+            data_tests: [unique, not_null]

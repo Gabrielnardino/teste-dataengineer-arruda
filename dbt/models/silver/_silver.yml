@@ -1,0 +1,197 @@
+version: 2
+
+models:
+  - name: stg_clientes
+    description: Clientes com nomes de negócio, textos limpos (trim, vazio vira NULL).
+    columns:
+      - name: cliente_id
+        data_type: varchar(5)
+        description: Código do cliente (chave natural da origem).
+        data_tests: [unique, not_null]
+      - name: nome_empresa
+        data_type: varchar(40)
+        description: Razão social do cliente.
+        data_tests: [not_null]
+      - name: nome_contato
+        data_type: varchar(30)
+        description: Pessoa de contato no cliente.
+      - name: cargo_contato
+        data_type: varchar(30)
+        description: Cargo da pessoa de contato.
+      - name: endereco
+        data_type: varchar(60)
+        description: Endereço do cliente.
+      - name: cidade
+        data_type: varchar(15)
+        description: Cidade do cliente.
+      - name: regiao
+        data_type: varchar(15)
+        description: Estado/província. NULL nos países onde a origem não usa região (legítimo).
+      - name: cep
+        data_type: varchar(10)
+        description: Código postal. NULL para o cliente da Irlanda, que não tinha CEP na época.
+      - name: pais
+        data_type: varchar(15)
+        description: País do cliente.
+        data_tests: [not_null]
+      - name: telefone
+        data_type: varchar(24)
+        description: Telefone, no formato livre da origem.
+      - name: fax
+        data_type: varchar(24)
+        description: Fax. NULL quando o cliente não possui.
+
+  - name: stg_pedidos
+    description: Cabeçalho dos pedidos tipado, com flags de status de entrega.
+    columns:
+      - name: pedido_id
+        data_type: integer
+        description: Número do pedido.
+        data_tests: [unique, not_null]
+      - name: cliente_id
+        data_type: varchar(5)
+        description: Cliente que fez o pedido.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_clientes')
+              field: cliente_id
+      - name: funcionario_id
+        data_type: integer
+        description: Vendedor responsável (tabela de funcionários fora do escopo).
+      - name: transportadora_id
+        data_type: integer
+        description: Transportadora (tabela de transportadoras fora do escopo).
+      - name: data_pedido
+        data_type: date
+        description: Data em que o pedido foi feito.
+        data_tests: [not_null]
+      - name: data_limite_entrega
+        data_type: date
+        description: Data limite combinada para a entrega.
+      - name: data_envio
+        data_type: date
+        description: Data de envio. NULL quando o pedido ainda não foi enviado.
+      - name: valor_frete
+        data_type: numeric(10,2)
+        description: Valor do frete, convertido de float para numeric.
+        data_tests:
+          - valor_no_intervalo:
+              min: 0
+      - name: nome_destinatario
+        data_type: varchar(40)
+        description: Nome de quem recebe. Pode diferir da razão social do cliente (34 pedidos).
+      - name: endereco_entrega
+        data_type: varchar(60)
+        description: Endereço de entrega.
+      - name: cidade_entrega
+        data_type: varchar(15)
+        description: Cidade de entrega.
+      - name: regiao_entrega
+        data_type: varchar(15)
+        description: Estado/província de entrega. NULL quando o país não usa região.
+      - name: cep_entrega
+        data_type: varchar(10)
+        description: Código postal de entrega.
+      - name: pais_entrega
+        data_type: varchar(15)
+        description: País de entrega.
+      - name: pedido_enviado
+        data_type: boolean
+        description: Verdadeiro quando há data de envio. Os 21 pedidos sem envio são todos do último mês (pendentes).
+        data_tests: [not_null]
+      - name: entregue_com_atraso
+        data_type: boolean
+        description: Verdadeiro quando o envio ocorreu depois da data limite.
+        data_tests: [not_null]
+
+  - name: stg_itens_pedido
+    description: Itens dos pedidos com preço e desconto em numeric (a origem guarda em float4).
+    data_tests:
+      - combinacao_unica:
+          colunas: [pedido_id, produto_id]
+    columns:
+      - name: pedido_id
+        data_type: integer
+        description: Pedido ao qual o item pertence.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_pedidos')
+              field: pedido_id
+      - name: produto_id
+        data_type: integer
+        description: Produto vendido.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_produtos')
+              field: produto_id
+      - name: preco_unitario
+        data_type: numeric(10,2)
+        description: Preço praticado no pedido (histórico). Difere do preço atual do produto em 662 itens.
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 0
+      - name: quantidade
+        data_type: integer
+        description: Quantidade vendida.
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 1
+      - name: desconto
+        data_type: numeric(4,2)
+        description: Percentual de desconto (0.05 = 5%).
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 0
+              max: 1
+          - accepted_values:
+              name: desconto_fora_da_politica
+              values: [0, 0.05, 0.1, 0.15, 0.2, 0.25]
+              quote: false
+              config:
+                severity: warn
+
+  - name: stg_produtos
+    description: Produtos tipados, com o indicador de descontinuado como boolean.
+    columns:
+      - name: produto_id
+        data_type: integer
+        description: Código do produto.
+        data_tests: [unique, not_null]
+      - name: nome_produto
+        data_type: varchar(40)
+        description: Nome do produto.
+        data_tests: [not_null]
+      - name: fornecedor_id
+        data_type: integer
+        description: Fornecedor (tabela de fornecedores fora do escopo).
+      - name: categoria_id
+        data_type: integer
+        description: Categoria (tabela de categorias fora do escopo).
+      - name: quantidade_por_unidade
+        data_type: varchar(20)
+        description: Descrição da embalagem (ex. "10 boxes x 20 bags").
+      - name: preco_unitario
+        data_type: numeric(10,2)
+        description: Preço de tabela atual do produto.
+        data_tests:
+          - valor_no_intervalo:
+              min: 0
+      - name: unidades_em_estoque
+        data_type: integer
+        description: Unidades em estoque.
+      - name: unidades_em_pedido
+        data_type: integer
+        description: Unidades em pedido de compra junto ao fornecedor.
+      - name: nivel_reposicao
+        data_type: integer
+        description: Estoque mínimo que dispara reposição.
+      - name: descontinuado
+        data_type: boolean
+        description: Produto fora de linha (origem guarda 0/1).
+        data_tests: [not_null]

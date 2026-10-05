@@ -1,7 +1,4 @@
 docs/
-.claude/
-CLAUDE.md
-AGENTS.md
 .env
 
 dbt/target/

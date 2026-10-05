@@ -1,0 +1,7 @@
+services:
+  db:
+    image: postgres:16
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 2s
+      retries: 30

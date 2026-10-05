@@ -1,0 +1,56 @@
+unit_tests:
+  - name: limpa_espacos_e_converte_vazio_em_nulo
+    description: Texto com espaços nas pontas é aparado; vazio ou só espaços vira NULL.
+    model: stg_clientes
+    given:
+      - input: source('bronze', 'raw_customers')
+        rows:
+          - {customer_id: ' ALF ', company_name: '  Alfreds Futterkiste ', region: '', postal_code: '   ', fax: null, country: 'Germany'}
+    expect:
+      rows:
+        - {cliente_id: 'ALF', nome_empresa: 'Alfreds Futterkiste', regiao: null, cep: null, fax: null, pais: 'Germany'}
+
+  - name: classifica_status_de_entrega
+    description: No prazo, atrasado, entregue no dia limite e pendente (sem envio não é atraso).
+    model: stg_pedidos
+    given:
+      - input: source('bronze', 'raw_orders')
+        rows:
+          - {order_id: 1, order_date: '1998-01-01', required_date: '1998-01-10', shipped_date: '1998-01-05'}
+          - {order_id: 2, order_date: '1998-01-01', required_date: '1998-01-10', shipped_date: '1998-01-15'}
+          - {order_id: 3, order_date: '1998-01-01', required_date: '1998-01-10', shipped_date: '1998-01-10'}
+          - {order_id: 4, order_date: '1998-01-01', required_date: '1998-01-10', shipped_date: null}
+    expect:
+      rows:
+        - {pedido_id: 1, pedido_enviado: true, entregue_com_atraso: false}
+        - {pedido_id: 2, pedido_enviado: true, entregue_com_atraso: true}
+        - {pedido_id: 3, pedido_enviado: true, entregue_com_atraso: false}
+        - {pedido_id: 4, pedido_enviado: false, entregue_com_atraso: false}
+
+  - name: converte_float_para_numeric_sem_ruido
+    description: Valores float4 da origem (0.15 é guardado como 0.150000006) saem exatos em numeric.
+    model: stg_itens_pedido
+    given:
+      - input: source('bronze', 'raw_order_details')
+        rows:
+          - {order_id: 10248, product_id: 11, unit_price: 14.0, quantity: 12, discount: 0}
+          - {order_id: 10249, product_id: 14, unit_price: 18.6, quantity: 9, discount: 0.15}
+          - {order_id: 10250, product_id: 41, unit_price: 7.7, quantity: 10, discount: 0.05}
+    expect:
+      rows:
+        - {pedido_id: 10248, produto_id: 11, preco_unitario: 14.00, quantidade: 12, desconto: 0.00}
+        - {pedido_id: 10249, produto_id: 14, preco_unitario: 18.60, quantidade: 9, desconto: 0.15}
+        - {pedido_id: 10250, produto_id: 41, preco_unitario: 7.70, quantidade: 10, desconto: 0.05}
+
+  - name: converte_descontinuado_para_boolean
+    description: A origem guarda 0/1; a silver expõe boolean.
+    model: stg_produtos
+    given:
+      - input: source('bronze', 'raw_products')
+        rows:
+          - {product_id: 1, product_name: 'Chai', discontinued: 0}
+          - {product_id: 5, product_name: 'Chef Anton''s Gumbo Mix', discontinued: 1}
+    expect:
+      rows:
+        - {produto_id: 1, nome_produto: 'Chai', descontinuado: false}
+        - {produto_id: 5, nome_produto: "Chef Anton's Gumbo Mix", descontinuado: true}

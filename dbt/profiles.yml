@@ -1,0 +1,12 @@
+arruda:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: dw
+      port: 5432
+      user: postgres
+      password: "{{ env_var('POSTGRES_PASSWORD', 'postgres') }}"
+      dbname: dw
+      schema: public
+      threads: 4

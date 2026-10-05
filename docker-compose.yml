@@ -1,0 +1,50 @@
+# origem: compose oficial do pthom/northwind_psql (submódulo em source/) + nossos ajustes
+include:
+  - path: [source/docker-compose.yml, northwind.override.yml]
+
+services:
+  # destino: bronze, silver e gold
+  dw:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dw
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./dw/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports: ["55433:5432"]
+    networks: [db]
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 2s
+      retries: 30
+
+  hop:
+    image: apache/hop:2.19.0
+    profiles: [jobs]
+    environment:
+      HOP_PROJECT_NAME: arruda
+      HOP_PROJECT_FOLDER: /project
+      HOP_FILE_PATH: $${PROJECT_HOME}/bronze_load.hpl
+      HOP_RUN_CONFIG: local
+      HOP_LOG_LEVEL: Basic
+      HOP_SYSTEM_PROPERTIES: POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./hop:/project
+    networks: [db]
+    depends_on:
+      db: {condition: service_healthy}
+      dw: {condition: service_healthy}
+
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.9.0
+    profiles: [jobs]
+    working_dir: /usr/app
+    environment:
+      DBT_PROFILES_DIR: /usr/app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./dbt:/usr/app
+    ports: ["8080:8080"]
+    networks: [db]
+    depends_on:
+      dw: {condition: service_healthy}

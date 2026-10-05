@@ -1,0 +1,16 @@
+name: arruda
+version: 1.0.0
+profile: arruda
+
+models:
+  arruda:
+    silver:
+      +schema: silver
+      +materialized: view
+      +contract:
+        enforced: true
+    gold:
+      +schema: gold
+      +materialized: table
+      +contract:
+        enforced: true

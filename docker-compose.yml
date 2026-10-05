@@ -17,3 +17,20 @@ services:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 2s
       retries: 30
+
+  hop:
+    image: apache/hop:2.19.0
+    profiles: [jobs]
+    environment:
+      HOP_PROJECT_NAME: arruda
+      HOP_PROJECT_FOLDER: /project
+      HOP_FILE_PATH: $${PROJECT_HOME}/bronze_load.hpl
+      HOP_RUN_CONFIG: local
+      HOP_LOG_LEVEL: Basic
+      HOP_SYSTEM_PROPERTIES: POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./hop:/project
+    networks: [db]
+    depends_on:
+      db: {condition: service_healthy}
+      dw: {condition: service_healthy}

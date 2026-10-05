@@ -44,7 +44,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - ./dbt:/usr/app
-    ports: ["8080:8080"]
     networks: [db]
     depends_on:
       dw: {condition: service_healthy}

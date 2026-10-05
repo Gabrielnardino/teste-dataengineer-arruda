@@ -23,4 +23,4 @@ test-sources:
 	$(DBT) test --select "source:*"
 
 transform:
-	$(DBT) build --exclude "source:*"
+	$(DBT) build --select silver

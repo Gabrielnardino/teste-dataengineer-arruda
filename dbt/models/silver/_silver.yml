@@ -3,6 +3,9 @@ version: 2
 models:
   - name: stg_clientes
     description: Clientes com nomes de negócio, textos limpos (trim, vazio vira NULL).
+    data_tests:
+      - mesma_contagem:
+          comparar_com: source('bronze', 'raw_customers')
     columns:
       - name: cliente_id
         data_type: varchar(5)
@@ -43,6 +46,15 @@ models:
 
   - name: stg_pedidos
     description: Cabeçalho dos pedidos tipado, com flags de status de entrega.
+    data_tests:
+      - mesma_contagem:
+          comparar_com: source('bronze', 'raw_orders')
+      - expressao_verdadeira:
+          name: envio_nao_anterior_ao_pedido
+          expressao: data_envio >= data_pedido
+      - expressao_verdadeira:
+          name: prazo_nao_anterior_ao_pedido
+          expressao: data_limite_entrega >= data_pedido
     columns:
       - name: pedido_id
         data_type: integer
@@ -80,7 +92,7 @@ models:
               min: 0
       - name: nome_destinatario
         data_type: varchar(40)
-        description: Nome de quem recebe. Pode diferir da razão social do cliente (34 pedidos).
+        description: Nome de quem recebe. Pode diferir da razão social do cliente.
       - name: endereco_entrega
         data_type: varchar(60)
         description: Endereço de entrega.
@@ -98,7 +110,7 @@ models:
         description: País de entrega.
       - name: pedido_enviado
         data_type: boolean
-        description: Verdadeiro quando há data de envio. Os 21 pedidos sem envio são todos do último mês (pendentes).
+        description: Verdadeiro quando há data de envio. Pedido sem envio é pendente, não erro.
         data_tests: [not_null]
       - name: entregue_com_atraso
         data_type: boolean
@@ -108,6 +120,8 @@ models:
   - name: stg_itens_pedido
     description: Itens dos pedidos com preço e desconto em numeric (a origem guarda em float4).
     data_tests:
+      - mesma_contagem:
+          comparar_com: source('bronze', 'raw_order_details')
       - combinacao_unica:
           colunas: [pedido_id, produto_id]
     columns:
@@ -129,7 +143,7 @@ models:
               field: produto_id
       - name: preco_unitario
         data_type: numeric(10,2)
-        description: Preço praticado no pedido (histórico). Difere do preço atual do produto em 662 itens.
+        description: Preço praticado no pedido (histórico). Pode diferir do preço atual do produto.
         data_tests:
           - not_null
           - valor_no_intervalo:
@@ -158,6 +172,9 @@ models:
 
   - name: stg_produtos
     description: Produtos tipados, com o indicador de descontinuado como boolean.
+    data_tests:
+      - mesma_contagem:
+          comparar_com: source('bronze', 'raw_products')
     columns:
       - name: produto_id
         data_type: integer
@@ -185,12 +202,21 @@ models:
       - name: unidades_em_estoque
         data_type: integer
         description: Unidades em estoque.
+        data_tests:
+          - valor_no_intervalo:
+              min: 0
       - name: unidades_em_pedido
         data_type: integer
         description: Unidades em pedido de compra junto ao fornecedor.
+        data_tests:
+          - valor_no_intervalo:
+              min: 0
       - name: nivel_reposicao
         data_type: integer
         description: Estoque mínimo que dispara reposição.
+        data_tests:
+          - valor_no_intervalo:
+              min: 0
       - name: descontinuado
         data_type: boolean
         description: Produto fora de linha (origem guarda 0/1).

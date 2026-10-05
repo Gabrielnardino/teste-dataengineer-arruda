@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Bronze deve ser cópia fiel da origem: mesma contagem e mesmo hash do conteúdo, tabela a tabela.
 set -euo pipefail
 
 fingerprint="select count(*) || ' ' || coalesce(md5(string_agg(t::text, '|' order by t::text)), '-') from %s t"

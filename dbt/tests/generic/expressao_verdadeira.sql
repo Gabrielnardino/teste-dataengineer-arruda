@@ -1,4 +1,4 @@
-{% test expressao_verdadeira(model, expressao) %}
+{% test expressao_verdadeira(model, expressao, column_name=none) %}
 
 select *
 from {{ model }}

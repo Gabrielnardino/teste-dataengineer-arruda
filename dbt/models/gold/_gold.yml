@@ -1,0 +1,209 @@
+version: 2
+
+models:
+  - name: dm_calendario
+    description: Dimensão de datas gerada no dbt, um registro por dia do primeiro ao último pedido.
+    columns:
+      - name: data
+        data_type: date
+        description: Data do calendário (chave da dimensão).
+        data_tests: [unique, not_null]
+      - name: ano
+        data_type: integer
+        description: Ano.
+        data_tests: [not_null]
+      - name: trimestre
+        data_type: integer
+        description: Trimestre do ano (1 a 4).
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 1
+              max: 4
+      - name: mes
+        data_type: integer
+        description: Mês do ano (1 a 12).
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 1
+              max: 12
+      - name: nome_mes
+        data_type: varchar(9)
+        description: Nome do mês em português.
+        data_tests: [not_null]
+      - name: dia_semana
+        data_type: integer
+        description: Dia da semana no padrão ISO (1 = segunda, 7 = domingo).
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 1
+              max: 7
+      - name: nome_dia_semana
+        data_type: varchar(13)
+        description: Nome do dia da semana em português.
+        data_tests: [not_null]
+      - name: fim_de_semana
+        data_type: boolean
+        description: Verdadeiro para sábado e domingo.
+        data_tests:
+          - not_null
+          - expressao_verdadeira:
+              name: fim_de_semana_coerente_com_dia_semana
+              expressao: fim_de_semana = (dia_semana in (6, 7))
+
+  - name: dm_cliente
+    description: Dimensão de clientes, inclusive os que ainda não compraram.
+    data_tests:
+      - mesma_contagem:
+          comparar_com: ref('stg_clientes')
+    columns:
+      - name: cliente_id
+        data_type: varchar(5)
+        description: Código do cliente (chave natural).
+        data_tests: [unique, not_null]
+      - name: nome_empresa
+        data_type: varchar(40)
+        description: Razão social do cliente.
+        data_tests: [not_null]
+      - name: nome_contato
+        data_type: varchar(30)
+        description: Pessoa de contato no cliente.
+      - name: cargo_contato
+        data_type: varchar(30)
+        description: Cargo da pessoa de contato.
+      - name: endereco
+        data_type: varchar(60)
+        description: Endereço do cliente.
+      - name: cidade
+        data_type: varchar(15)
+        description: Cidade do cliente.
+        data_tests: [not_null]
+      - name: regiao
+        data_type: varchar(15)
+        description: Estado/província; "Não informado" quando o país não usa região.
+        data_tests: [not_null]
+      - name: cep
+        data_type: varchar(15)
+        description: Código postal; "Não informado" quando ausente.
+        data_tests: [not_null]
+      - name: pais
+        data_type: varchar(15)
+        description: País do cliente.
+        data_tests: [not_null]
+      - name: telefone
+        data_type: varchar(24)
+        description: Telefone, no formato livre da origem.
+
+  - name: dm_produto
+    description: Dimensão de produtos.
+    data_tests:
+      - mesma_contagem:
+          comparar_com: ref('stg_produtos')
+    columns:
+      - name: produto_id
+        data_type: integer
+        description: Código do produto (chave natural).
+        data_tests: [unique, not_null]
+      - name: nome_produto
+        data_type: varchar(40)
+        description: Nome do produto.
+        data_tests: [not_null]
+      - name: categoria_id
+        data_type: integer
+        description: Código da categoria (tabela de categorias fora do escopo do teste).
+      - name: fornecedor_id
+        data_type: integer
+        description: Código do fornecedor (tabela de fornecedores fora do escopo do teste).
+      - name: quantidade_por_unidade
+        data_type: varchar(20)
+        description: Descrição da embalagem.
+      - name: preco_unitario_atual
+        data_type: numeric(10,2)
+        description: Preço de tabela atual. Para análise de vendas use o preço histórico da ft_vendas.
+      - name: descontinuado
+        data_type: boolean
+        description: Produto fora de linha.
+        data_tests: [not_null]
+
+  - name: ft_vendas
+    description: Fato de vendas. Grão, uma linha por item do pedido (pedido + produto).
+    data_tests:
+      - combinacao_unica:
+          colunas: [pedido_id, produto_id]
+      - mesma_contagem:
+          comparar_com: ref('stg_itens_pedido')
+      - expressao_verdadeira:
+          name: valor_bruto_igual_preco_vezes_quantidade
+          expressao: valor_bruto = preco_unitario * quantidade
+      - expressao_verdadeira:
+          name: valor_liquido_igual_bruto_menos_desconto
+          expressao: valor_liquido = valor_bruto - valor_desconto
+      - expressao_verdadeira:
+          name: desconto_nao_maior_que_bruto
+          expressao: valor_desconto <= valor_bruto
+    columns:
+      - name: pedido_id
+        data_type: integer
+        description: Número do pedido (dimensão degenerada).
+        data_tests: [not_null]
+      - name: produto_id
+        data_type: integer
+        description: Produto vendido.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dm_produto')
+              field: produto_id
+      - name: cliente_id
+        data_type: varchar(5)
+        description: Cliente que comprou.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dm_cliente')
+              field: cliente_id
+      - name: data_pedido
+        data_type: date
+        description: Data do pedido, chave para a dm_calendario.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dm_calendario')
+              field: data
+      - name: quantidade
+        data_type: integer
+        description: Quantidade vendida.
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 1
+      - name: preco_unitario
+        data_type: numeric(10,2)
+        description: Preço praticado no pedido (histórico).
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 0
+      - name: valor_bruto
+        data_type: numeric(12,2)
+        description: Preço unitário vezes quantidade.
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 0
+      - name: valor_desconto
+        data_type: numeric(14,4)
+        description: Valor bruto vezes percentual de desconto, exato (4 casas). Arredondar só na apresentação.
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 0
+      - name: valor_liquido
+        data_type: numeric(14,4)
+        description: Valor bruto menos o desconto, exato (4 casas). Arredondar só na apresentação.
+        data_tests:
+          - not_null
+          - valor_no_intervalo:
+              min: 0

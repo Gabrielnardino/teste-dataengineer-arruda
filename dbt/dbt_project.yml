@@ -9,3 +9,8 @@ models:
       +materialized: view
       +contract:
         enforced: true
+    gold:
+      +schema: gold
+      +materialized: table
+      +contract:
+        enforced: true

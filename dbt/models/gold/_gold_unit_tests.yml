@@ -1,0 +1,48 @@
+unit_tests:
+  - name: calcula_metricas_da_venda
+    description: Sem desconto, desconto simples e desconto com fração de centavo (1.155 é mantido, sem arredondar).
+    model: ft_vendas
+    given:
+      - input: ref('stg_itens_pedido')
+        rows:
+          - {pedido_id: 1, produto_id: 11, preco_unitario: 14.00, quantidade: 12, desconto: 0.00}
+          - {pedido_id: 1, produto_id: 42, preco_unitario: 9.80, quantidade: 10, desconto: 0.15}
+          - {pedido_id: 2, produto_id: 7, preco_unitario: 7.70, quantidade: 3, desconto: 0.05}
+      - input: ref('stg_pedidos')
+        rows:
+          - {pedido_id: 1, cliente_id: 'VINET', data_pedido: '1996-07-04'}
+          - {pedido_id: 2, cliente_id: 'TOMSP', data_pedido: '1996-07-05'}
+    expect:
+      rows:
+        - {pedido_id: 1, produto_id: 11, cliente_id: 'VINET', data_pedido: '1996-07-04', valor_bruto: 168.00, valor_desconto: 0.00, valor_liquido: 168.00}
+        - {pedido_id: 1, produto_id: 42, cliente_id: 'VINET', data_pedido: '1996-07-04', valor_bruto: 98.00, valor_desconto: 14.70, valor_liquido: 83.30}
+        - {pedido_id: 2, produto_id: 7, cliente_id: 'TOMSP', data_pedido: '1996-07-05', valor_bruto: 23.10, valor_desconto: 1.155, valor_liquido: 21.945}
+
+  - name: gera_um_dia_por_data_com_atributos_em_portugues
+    description: Do primeiro ao último pedido, inclusive dias sem venda, com fim de semana e nomes em português.
+    model: dm_calendario
+    given:
+      - input: ref('stg_pedidos')
+        rows:
+          - {data_pedido: '1997-12-31'}
+          - {data_pedido: '1998-01-04'}
+    expect:
+      rows:
+        - {data: '1997-12-31', ano: 1997, trimestre: 4, mes: 12, nome_mes: 'Dezembro', dia_semana: 3, nome_dia_semana: 'Quarta-feira', fim_de_semana: false}
+        - {data: '1998-01-01', ano: 1998, trimestre: 1, mes: 1, nome_mes: 'Janeiro', dia_semana: 4, nome_dia_semana: 'Quinta-feira', fim_de_semana: false}
+        - {data: '1998-01-02', ano: 1998, trimestre: 1, mes: 1, nome_mes: 'Janeiro', dia_semana: 5, nome_dia_semana: 'Sexta-feira', fim_de_semana: false}
+        - {data: '1998-01-03', ano: 1998, trimestre: 1, mes: 1, nome_mes: 'Janeiro', dia_semana: 6, nome_dia_semana: 'Sábado', fim_de_semana: true}
+        - {data: '1998-01-04', ano: 1998, trimestre: 1, mes: 1, nome_mes: 'Janeiro', dia_semana: 7, nome_dia_semana: 'Domingo', fim_de_semana: true}
+
+  - name: dimensao_cliente_preenche_atributos_ausentes
+    description: Região e CEP nulos viram "Não informado" para não aparecer vazio no BI.
+    model: dm_cliente
+    given:
+      - input: ref('stg_clientes')
+        rows:
+          - {cliente_id: 'HUNGO', nome_empresa: 'Hungry Owl All-Night Grocers', cidade: 'Cork', regiao: 'Co. Cork', cep: null, pais: 'Ireland'}
+          - {cliente_id: 'ALFKI', nome_empresa: 'Alfreds Futterkiste', cidade: 'Berlin', regiao: null, cep: '12209', pais: 'Germany'}
+    expect:
+      rows:
+        - {cliente_id: 'HUNGO', regiao: 'Co. Cork', cep: 'Não informado'}
+        - {cliente_id: 'ALFKI', regiao: 'Não informado', cep: '12209'}
